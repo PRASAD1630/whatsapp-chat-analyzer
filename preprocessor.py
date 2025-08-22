@@ -2,26 +2,35 @@ import re
 import pandas as pd
 
 def preprocess(data):
-    # Define regex pattern to match WhatsApp message lines
-    pattern = r'(\d{1,2}/\d{1,2}/\d{4}),\s(\d{1,2}:\d{2}\u202f?[ap]m)\s-\s(.*?):\s(.*)'
+    """
+    Preprocess WhatsApp chat text into a DataFrame.
+    Works with most WhatsApp export formats.
+    """
+
+    # Regex pattern to match WhatsApp messages
+    pattern = r'(\d{1,2}/\d{1,2}/\d{4}),\s(\d{1,2}:\d{2}\s?[apAP][mM])\s-\s(.*?):\s(.*)'
     matches = re.findall(pattern, data)
 
-    # Build DataFrame
     parsed_data = []
-    for date, time, author, message in matches:
-        parsed_data.append([date, time, author, message])
+    for date, time, user, message in matches:
+        parsed_data.append([date, time, user, message])
 
     df = pd.DataFrame(parsed_data, columns=['date', 'time', 'user', 'message'])
 
-    # Convert to datetime
-    df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y')
+    if df.empty:
+        return df  # Return empty DataFrame if no matches
 
-    # Extract time-based features
+    # Convert date to datetime
+    df['date'] = pd.to_datetime(df['date'], format='%d/%m/%Y', errors='coerce')
+
+    # Extract additional time features
     df['year'] = df['date'].dt.year
     df['month'] = df['date'].dt.month_name()
     df['day'] = df['date'].dt.day
-    df['time'] = df['time'].str.replace('\u202f', '')  # remove narrow no-break space
-    df['hour'] = pd.to_datetime(df['time'], format='%I:%M%p').dt.hour
-    df['minute'] = pd.to_datetime(df['time'], format='%I:%M%p').dt.minute
+
+    # Clean and convert time
+    df['time'] = df['time'].str.replace('\u202f', '', regex=False)  # remove narrow no-break space
+    df['hour'] = pd.to_datetime(df['time'], format='%I:%M%p', errors='coerce').dt.hour
+    df['minute'] = pd.to_datetime(df['time'], format='%I:%M%p', errors='coerce').dt.minute
 
     return df
